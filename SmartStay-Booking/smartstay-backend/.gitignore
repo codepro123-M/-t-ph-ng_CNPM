@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+backend/app/static/audio/*.mp3
+backend/app/static/poi-images/*
+backend/app/static/maps/packs/*
+!backend/app/static/**/.gitkeep
+# Local HTTPS CA exports (never commit certificate material).
+dev-certs/
+backend/runtime_data/content-media/

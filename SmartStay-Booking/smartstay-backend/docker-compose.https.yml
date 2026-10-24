@@ -1,0 +1,22 @@
+# Local HTTPS for Secure cookies. This development CA is not a production TLS setup.
+services:
+  gateway:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - https_data:/data
+      - https_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+volumes:
+  https_data:
+  https_config:

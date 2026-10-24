@@ -1,0 +1,89 @@
+{
+  "version": "booking-1",
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "4651e6187438c79dc0d121344e6d6eeab12883414d6cf4536086f80213993995"
+    },
+    {
+      "path": ".github/workflows/quality.yml",
+      "sha256": "9d6f775fad0307905d22554dd8ca49e705bab3464df87e23ee31a9c71813df64"
+    },
+    {
+      "path": "HUONG_DAN_DAT_PHONG.md",
+      "sha256": "cdb62553f11ff029fa5a73230427e3ddaffe48e7b723e00aaa3ffa4814ffc863"
+    },
+    {
+      "path": "backend/app/admin/bootstrap.py",
+      "sha256": "0adef0d30ff88a993555317f42a0e70dd553b30d6a888f0cb3af8d6afe8c58f1"
+    },
+    {
+      "path": "backend/app/admin/schemas.py",
+      "sha256": "cedc1048f8922d320ae92cce7483d59cb434ec222f9400356e35d8fce254d041"
+    },
+    {
+      "path": "backend/app/bookings/__init__.py",
+      "sha256": "e9c314aa434bcca540dc1ca125d48b51673b7d0a9dd676f98f0ee93210981bec"
+    },
+    {
+      "path": "backend/app/bookings/bootstrap.py",
+      "sha256": "b508dcd8929ae55da618f0dd99971b4894484841a02edc72329632cfce7a496b"
+    },
+    {
+      "path": "backend/app/bookings/router.py",
+      "sha256": "5475cd7e621bf6af8117f611bcbe9d409226fee2e845ccc06227f4dc33fed608"
+    },
+    {
+      "path": "backend/app/bookings/schemas.py",
+      "sha256": "f780ac96851529cd95e73bdf30345a9227d195aaa5fe26a63c664e6f4919e971"
+    },
+    {
+      "path": "backend/app/bookings/service.py",
+      "sha256": "66834d0cc66712a11ac24d203cb0baaeecbd7d2c7f02d79a9e8a59b27df194e7"
+    },
+    {
+      "path": "backend/app/content/common.py",
+      "sha256": "f1bb594b50c55fe31120c21e49c02dc2c86866312b812b5bc9448469793ffaaa"
+    },
+    {
+      "path": "backend/app/content/schemas.py",
+      "sha256": "c243b25cd25387176eb11f4e0842f7c41fe36f8312ed487b16b5286fc0494769"
+    },
+    {
+      "path": "backend/app/core/permissions.py",
+      "sha256": "460473ea92c4e53cf6a6b553e047bcc6f3ea65d36f8f9df67fabf4fa6088092f"
+    },
+    {
+      "path": "backend/app/main.py",
+      "sha256": "78d78abb2e84c5a27b4b932118a146dfed6e453da5ebeebeea72ca7941ec18ed"
+    },
+    {
+      "path": "backend/integration/check_booking_replica.py",
+      "sha256": "32572946095c65a6692d4003d6f167fc4bf4746fd633c0dec1c9b939b557c772"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "sha256": "bb73372982a6d63344a0670b517afb98bf7ad6e5e8ec07c0bf125cafab3fd68a"
+    },
+    {
+      "path": "backend/tests/test_bookings.py",
+      "sha256": "e94ff4ad368799fc06622d538a68c3183c1ca060af1d8dd24bbab69fcb842040"
+    },
+    {
+      "path": "backend/tests/test_lifecycle.py",
+      "sha256": "e993219558275f0b58ad0277e46fed183f7b0230ee92cb07cd2857f3cfadeec3"
+    },
+    {
+      "path": "backend/tests/test_phase2.py",
+      "sha256": "9148df401bc2d38df78967c00d50008586ace31189d6debd2ce33c228e254085"
+    },
+    {
+      "path": "backend/tests/test_phase2_rbac_owner_pii.py",
+      "sha256": "b8cdcf05dd6a779c50b4d9de5b21b75cda7833a33b3e0a6bd3cb37002462fd02"
+    },
+    {
+      "path": "scripts/smoke_phase2.py",
+      "sha256": "c81630e76460707acb90f7696e05f33838ffe010f0060832ebc6b171cb913f2e"
+    }
+  ]
+}
