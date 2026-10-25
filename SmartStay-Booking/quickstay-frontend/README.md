@@ -1,5 +1,7 @@
 # QuickStay — khách hàng và dashboard SmartStay
 
+Bản sửa 25/10/2026: đọc `../HUONG_DAN_SUA_5_LOI.md` để cập nhật cả hai phía có sao lưu. Kết quả mới nhất ở `../KET_QUA_SUA_5_LOI.md`.
+
 React kết nối FastAPI/MongoDB để đặt phòng thật. Dùng kèm backend trong gói SmartStay-Booking; backend giai đoạn 1–3 cũ chưa có API đặt phòng.
 
 ## Chạy trong VS Code
@@ -45,6 +47,7 @@ Access/refresh token chỉ nằm trong bộ nhớ. Client tự làm mới access
 |---|---|
 | Nội dung/đa ngôn ngữ | `GET /poi/load-all`, `GET /poi/{id}` |
 | Đăng ký/đăng nhập khách | `POST /api/v1/auth/register`, `POST /api/v1/auth/session` |
+| Tạo bản dịch/giọng nói | `POST /localizations/on-demand`, `GET /localizations/poi/{id}/status` |
 | Kiểm tra theo ngày | `GET /bookings/availability` |
 | Gửi đơn, xem đơn cá nhân | `POST /bookings`, `GET /bookings`, `GET /bookings/{id}` |
 | Khách hủy đơn | `PATCH /bookings/{id}/cancel` |
@@ -66,7 +69,7 @@ Dùng `VITE_SMARTSTAY_API_BASE=https://api.ten-mien-cua-ban.com` và build lại
 - Đơn được lưu thật. Chưa có thanh toán trực tuyến, email xác nhận hoặc hoàn tiền; khách thanh toán trực tiếp với khách sạn. Thống kê là số đơn, không phải tiền đã thu.
 - Dashboard dành cho admin có `booking.read` / `booking.update`; chưa có màn hình đơn riêng theo từng chủ khách sạn.
 - Lượt QR/truy cập/nghe chưa có API ghi nhận.
-- Thuyết minh phát bản ghi backend nếu có, hoặc giọng đọc trình duyệt với nhãn nguồn.
+- Thuyết minh gửi tác vụ tạo bản dịch/MP3 đúng ngôn ngữ, theo dõi tiến độ và phát media backend. Có nút chọn giọng trình duyệt khi dịch vụ ngoài lỗi.
 - Ưu đãi/đánh giá/newsletter trang giới thiệu vẫn là nội dung mẫu.
 
 ## Kiểm tra
@@ -76,7 +79,7 @@ npm test
 npm run build
 ```
 
-20 kiểm tra frontend bao gồm hợp đồng API, đồng bộ nội dung, bearer token, làm mới phiên đồng thời, truy vấn phòng/ngày và lỗi tồn phòng. Trình duyệt thử bằng dữ liệu kiểm thử độc lập. Kiểm tra đồng thời/rollback MongoDB thật nằm trong backend.
+22 kiểm tra API/client và 4 kịch bản giao diện React bao gồm hợp đồng API, đồng bộ nội dung, bearer token, làm mới phiên đồng thời, truy vấn phòng/ngày và lỗi tồn phòng. Trình duyệt thử bằng dữ liệu kiểm thử độc lập. Kiểm tra đồng thời/rollback MongoDB thật nằm trong backend.
 
 ## Nguồn thiết kế
 

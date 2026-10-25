@@ -1,5 +1,6 @@
 """Unit tests isolate services; integration tests also run on a real replica set."""
 
+import asyncio
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -106,6 +107,10 @@ class Session:
 
 @pytest.fixture
 def services(monkeypatch, tmp_path):
+    async def parked_worker():
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(main.audio_task_manager, "worker_loop", parked_worker)
     db = Database()
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     redis.ping = AsyncMock(return_value=True)

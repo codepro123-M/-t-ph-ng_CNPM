@@ -123,10 +123,22 @@ async def detail(poi_id: str, language: str = Query("vi", max_length=32)):
 @public.post("", status_code=201)
 async def create_poi(
     payload: POICreate,
+    auto_run_tts: bool = False,
+    activation_requested: bool = False,
     actor=Depends(require_permission("poi.create")),
     publisher=Depends(editor),
 ):
-    return await service.create_poi(payload, actor)
+    if activation_requested:
+        payload = payload.model_copy(update={"is_active": False})
+    poi = await service.create_poi(payload, actor)
+    if auto_run_tts or activation_requested:
+        from app.audio.task_manager import audio_task_manager
+
+        task = await audio_task_manager.enqueue(
+            poi["id"], activation_requested=activation_requested, actor=actor
+        )
+        poi["audio_task_id"] = task["id"]
+    return poi
 
 
 @public.patch("/{poi_id}")

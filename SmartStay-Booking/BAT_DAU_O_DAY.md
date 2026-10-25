@@ -1,74 +1,34 @@
-# Bắt đầu — SmartStay đặt phòng thật
+# Bắt đầu — SmartStay đã sửa 5 lỗi
 
-Gói gồm toàn bộ backend cập nhật, React cho khách và dashboard quản trị. ZIP chưa tự thay mã trên máy bạn; thực hiện các bước sau.
+Đọc **HUONG_DAN_SUA_5_LOI.md** trước khi cập nhật bản đang chạy. Báo cáo kiểm tra: **KET_QUA_SUA_5_LOI.md**.
 
-## 1. Cập nhật backend cũ
+## Cập nhật bản cũ
 
-Giải nén bằng **Extract All / Giải nén tất cả**. Mở thư mục SmartStay-Booking trong VS Code, mở Terminal:
-
-```powershell
-python .\AP_DUNG_DAT_PHONG.py
-```
-
-Nếu máy dùng Python Launcher, thay `python` bằng `py`. Khi được hỏi, dán đường dẫn backend **cũ** đang có `docker-compose.yml`, `.env` và thư mục `backend`.
-
-Script kiểm tra file, sao lưu mã cũ ở `booking-backups`, giữ dữ liệu MongoDB/Redis/S3 và các khóa/mật khẩu/cấu hình khác. Trong môi trường phát triển, `.env` chỉ được thêm origin localhost cổng 4173.
-
-Terminal tại backend cũ:
+Giải nén bản sửa vào thư mục riêng. Trong `SmartStay-Booking` vừa giải nén:
 
 ```powershell
-docker compose up -d --build backend
-docker compose ps
+python KIEM_TRA_GOI.py
+python AP_DUNG_SUA_5_LOI.py --project "C:\duong-dan\SmartStay-Booking-cu"
 ```
 
-Nếu dùng file Compose S3/HTTPS riêng, giữ cách thêm `-f`/`COMPOSE_FILE` hiện tại. Chờ backend healthy. Kiểm tra http://localhost:8001/health/ready và http://localhost:8001/docs: phải có nhóm bookings. Không cần xóa database.
+Công cụ cập nhật cả backend/frontend, sao lưu code cũ và giữ cấu hình cá nhân/dữ liệu. Nếu hai thư mục nằm riêng hoặc khác tên, dùng `--backend` và `--frontend` như hướng dẫn chi tiết.
 
-## 2. Chạy frontend mới
+Sau đó, tại backend **cũ** chạy `docker compose up -d --build backend`; tại frontend **cũ** chạy `npm ci` và `npm run dev`. Đăng nhập lại.
 
-Dừng frontend cũ bằng **Ctrl+C** để nhường cổng 4173. Mở thêm thư mục `quickstay-frontend` trong VS Code, Terminal tại đó:
+## Chạy mới
+
+Trong thư mục `SmartStay-Booking`:
 
 ```powershell
-npm install
-Copy-Item .env.example .env.local
-npm run dev
+python CHAY_DU_AN.py
 ```
 
-Cần Node.js 22.12 trở lên. Nếu trình duyệt vẫn lưu Design preview: mở nút đó hoặc nút kết nối cuối trang, chọn Live SmartStay API, nhập `/api`, lưu.
+Cần Python 3.10+, Node.js 22.12+ và Docker Desktop/Compose v2. Tài khoản admin xem trong `.env` riêng trên máy đã cấu hình, không có mật khẩu cố định trong code.
 
-## 3. Test bằng hai tab
+Trang khách: http://localhost:4173/#/rooms
 
-**Tab admin:** http://localhost:4173/#/admin. Dùng admin đã tạo ở giai đoạn 2, tương ứng `SUPERADMIN_USERNAME` của backend. Tài khoản đăng ký ở trang khách không dùng cho dashboard. Chọn Properties & rooms / Khách sạn & phòng, thêm khách sạn và một loại phòng, ví dụ:
+Dashboard: http://localhost:4173/#/admin
 
-- Tên: Khách sạn thử nghiệm SmartStay; loại hình Hotel.
-- Địa chỉ: Quận 1, TP. Hồ Chí Minh; giới thiệu tiếng Việt.
-- Vĩ độ `10.7769`, kinh độ `106.7009`.
-- Loại phòng Deluxe Double; giá `650000` VND/đêm.
-- Số khách/phòng `2`, số phòng thực tế `1`.
+Swagger: http://localhost:8001/docs
 
-**Tab khách:** http://localhost:4173/#/rooms. Bấm Login, đăng ký và đăng nhập tài khoản khách riêng. Chọn khách sạn, ngày tương lai, kiểm tra phòng trống, điền thông tin liên hệ rồi gửi đơn.
-
-Kết quả cần thấy:
-
-1. My Bookings có mã `SS-...`, giá và trạng thái chờ xác nhận.
-2. Dashboard tự hiện đơn sau khoảng 5 giây khi tab mở. Chi tiết có tên, điện thoại/email/ghi chú, loại phòng, ngày ở và tổng tiền.
-3. Admin xác nhận; My Bookings tự đổi trạng thái.
-4. Loại phòng số lượng 1 sẽ báo hết nếu đơn khác chọn trùng đêm.
-5. Hủy đơn sẽ mở lại phòng và cập nhật trạng thái ở dashboard.
-6. Tải lại trang, đăng nhập lại cùng tài khoản: đơn vẫn còn trong MongoDB.
-
-Token chỉ giữ trong bộ nhớ, nên tải lại trang cần đăng nhập lại; dữ liệu đơn không mất.
-
-## 4. Khách ở máy khác
-
-Để truy cập Internet, phải triển khai backend cùng MongoDB replica set/Redis trên máy chủ HTTPS và cấu hình URL đó cho frontend. `localhost` chỉ dùng trên máy đang chạy dự án. Gói cập nhật không tự đưa Docker trên máy bạn lên Internet.
-
-Chưa có thanh toán online, email xác nhận hay đếm lượt QR/nghe. Khách thanh toán với khách sạn; dashboard hiện số đơn/trạng thái.
-
-## Nội dung
-
-- `quickstay-frontend`: toàn bộ React, CSS, ảnh/font, tests, README.
-- `smartstay-backend`: backend, Docker Compose, tests, CI, hướng dẫn đặt phòng.
-- `AP_DUNG_DAT_PHONG.py`: cập nhật các file backend thay đổi, có sao lưu.
-- `UPDATE_MANIFEST.json`: danh sách và SHA-256 file cập nhật.
-
-Đã qua 166 kiểm tra backend, 20 kiểm tra frontend và build. Kiểm tra MongoDB thật xác nhận không đặt vượt phòng, lặp UUID không trùng đơn, lỗi audit rollback. Trình duyệt đã thử tạo khách sạn, gửi đơn, dashboard nhận/xác nhận và tự cập nhật trạng thái bằng dữ liệu kiểm thử độc lập.
+Nếu thấy Design preview, chọn Live SmartStay API và `/api` trong phần kết nối. Hướng dẫn chi tiết có bước thử đặt phòng bằng hai tab và thử dịch/giọng nói thật.

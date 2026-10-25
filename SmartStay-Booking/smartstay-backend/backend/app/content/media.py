@@ -346,7 +346,9 @@ async def read_asset(asset_id, actor=None, *, editor=False):
 
 async def has_references(asset_id, session):
     db = get_db()
-    if await db["pois"].find_one({"images": asset_id}, session=session):
+    if await db["pois"].find_one(
+        {"$or": [{"images": asset_id}, {"audio_asset_id": asset_id}]}, session=session
+    ):
         return True
     if await db["poi_submissions"].find_one(
         {"status": "pending", "payload.images": asset_id}, session=session

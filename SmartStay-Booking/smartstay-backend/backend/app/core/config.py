@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -57,6 +58,12 @@ class Settings(BaseSettings):
     MAX_AUDIO_SIZE_BYTES: int = Field(
         default=25 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024
     )
+    TRANSLATION_PROVIDER: Literal["auto", "google", "mymemory"] = "auto"
+    TRANSLATION_CACHE_TTL_SECONDS: int = Field(
+        default=30 * 86400, ge=60, le=365 * 86400
+    )
+    TRANSLATION_GOOGLE_COOLDOWN_SECONDS: int = Field(default=900, ge=60, le=86400)
+    MYMEMORY_EMAIL: str = Field(default="", max_length=254)
 
     MEDIA_BACKEND: str = "local"
     S3_ENDPOINT_URL: str = ""

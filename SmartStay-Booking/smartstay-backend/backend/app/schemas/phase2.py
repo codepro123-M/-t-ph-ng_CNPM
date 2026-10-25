@@ -1,37 +1,36 @@
 from typing import List, Literal, Optional
 from pydantic import BaseModel, EmailStr, Field
 
-
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=6)
 
-
-class RegisterOwnerRequest(BaseModel):
+class OwnerRegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=8)
     full_name: str = Field(..., min_length=2, max_length=120)
-    phone: str = Field(..., min_length=9, max_length=15)
-    cccd_number: str = Field(..., min_length=9, max_length=12, pattern=r"^\d{9,12}$")
-    property_name: str = Field(..., min_length=3, max_length=180)
+    phone: str = Field(..., min_length=8, max_length=20)
+    cccd_number: str = Field(..., min_length=9, max_length=15)
+    property_name: str = Field(..., min_length=2, max_length=150)
     property_type: Literal["homestay", "hotel", "resort", "villa"] = "homestay"
-    property_address: str = Field(..., min_length=5, max_length=300)
-    business_license: Optional[str] = Field(default=None, max_length=60)
+    property_address: str = Field(..., min_length=5, max_length=255)
+    business_license: Optional[str] = None
 
-
-class ReviewRegistrationRequest(BaseModel):
+class RegistrationReviewRequest(BaseModel):
     status: Literal["approved", "rejected"]
-    review_note: Optional[str] = Field(default="Reviewed by Admin", max_length=500)
+    review_note: Optional[str] = Field(default=None, max_length=500)
 
+class RolePermissionsUpdateRequest(BaseModel):
+    permissions: List[str]
+    description: Optional[str] = None
 
-class CreateRoomCategoryRequest(BaseModel):
+class OwnerRoomCreateRequest(BaseModel):
     room_name: str = Field(..., min_length=2, max_length=120)
+    room_type: str = Field(default="deluxe")
     price_vnd: int = Field(..., gt=0)
     capacity: int = Field(default=2, ge=1, le=20)
-    amenities: List[str] = Field(default_factory=list)
 
-
-class SubmitOwnerContentRequest(BaseModel):
+class OwnerPostSubmitRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
-    narration_script_vi: str = Field(..., min_length=10, max_length=5000)
-    qr_zone_code: str = Field(..., min_length=2, max_length=60)
+    narration_text: str = Field(..., min_length=10, max_length=5000)
+    language: str = Field(default="vi")

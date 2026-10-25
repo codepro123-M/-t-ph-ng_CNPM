@@ -31,6 +31,7 @@ __pycache__/
 .pytest_cache/
 dev-certs/
 booking-backups/
+repair-backups/
 """
 
 
@@ -92,7 +93,9 @@ def prepare_configuration(root):
 def executable(name):
     path = shutil.which(name)
     if not path:
-        raise ValueError("Chua tim thay " + name + ". Cai cong cu nay, roi mo lai Terminal.")
+        raise ValueError(
+            "Chua tim thay " + name + ". Cai cong cu nay, roi mo lai Terminal."
+        )
     return path
 
 
@@ -113,9 +116,16 @@ def check_tools(root):
     docker, node, npm = (executable(name) for name in ("docker", "node", "npm"))
     try:
         run([docker, "compose", "version"], root, quiet=True, timeout=20)
-        run([docker, "info", "--format", "{{.ServerVersion}}"], root, quiet=True, timeout=20)
+        run(
+            [docker, "info", "--format", "{{.ServerVersion}}"],
+            root,
+            quiet=True,
+            timeout=20,
+        )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        raise ValueError("Mo Docker Desktop, cho Docker Engine chay va kiem tra Docker Compose v2.") from None
+        raise ValueError(
+            "Mo Docker Desktop, cho Docker Engine chay va kiem tra Docker Compose v2."
+        ) from None
 
     version = run([node, "--version"], root, quiet=True, timeout=10).stdout.strip()
     match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", version)
@@ -128,7 +138,9 @@ def check_tools(root):
     except OSError:
         occupied = False
     if occupied:
-        raise ValueError("Cong 4173 dang duoc dung. Dung frontend cu bang Ctrl+C, roi chay lai.")
+        raise ValueError(
+            "Cong 4173 dang duoc dung. Dung frontend cu bang Ctrl+C, roi chay lai."
+        )
     return docker, npm
 
 
@@ -150,7 +162,8 @@ def verify_backend():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--setup-only", action="store_true",
+        "--setup-only",
+        action="store_true",
         help="Chi tao/kiem tra cau hinh, khong chay Docker hay npm.",
     )
     args = parser.parse_args(argv)
@@ -166,29 +179,56 @@ def main(argv=None):
         if not args.setup_only:
             docker, npm = check_tools(root)
         prepare_configuration(root)
-        print("Da chuan bi .env backend, .env.local frontend va quy tac .gitignore.", flush=True)
-        print("Tai khoan admin: xem SUPERADMIN_USERNAME / SUPERADMIN_PASSWORD trong smartstay-backend/.env.")
-        print("Cac khoa va mat khau hop le da co duoc giu nguyen; khong in bi mat ra Terminal.")
+        print(
+            "Da chuan bi .env backend, .env.local frontend va quy tac .gitignore.",
+            flush=True,
+        )
+        print(
+            "Tai khoan admin: xem SUPERADMIN_USERNAME / SUPERADMIN_PASSWORD trong smartstay-backend/.env."
+        )
+        print(
+            "Cac khoa va mat khau hop le da co duoc giu nguyen; khong in bi mat ra Terminal."
+        )
         if args.setup_only:
             print("De khoi dong ca du an: python CHAY_DU_AN.py")
             return 0
 
         run([npm, "ci"], frontend)
-        run([docker, "compose", "up", "-d", "--build", "--wait", "--wait-timeout", "180"], backend)
+        run(
+            [
+                docker,
+                "compose",
+                "up",
+                "-d",
+                "--build",
+                "--wait",
+                "--wait-timeout",
+                "180",
+            ],
+            backend,
+        )
         verify_backend()
         print("\nBackend da tra loi kiem tra san sang.")
         print("Sau khi Vite hien Ready, mo http://localhost:4173/#/rooms")
         print("Dashboard: http://localhost:4173/#/admin")
         print("Tai lieu API: http://localhost:8001/docs")
         print("Neu trinh duyet nho Design preview: chon Live SmartStay API va /api.")
-        print("Giu Terminal mo. Ctrl+C dung frontend; Docker tiep tuc chay nen.", flush=True)
+        print(
+            "Giu Terminal mo. Ctrl+C dung frontend; Docker tiep tuc chay nen.",
+            flush=True,
+        )
         run([npm, "run", "dev"], frontend)
         return 0
     except KeyboardInterrupt:
-        print("\nDa dung frontend. De dung backend: cd smartstay-backend, sau do docker compose stop.")
+        print(
+            "\nDa dung frontend. De dung backend: cd smartstay-backend, sau do docker compose stop."
+        )
         return 0
     except subprocess.CalledProcessError as exc:
-        print("\nLenh khong thanh cong. Xem loi phia tren; neu la Docker, chay docker compose ps -a tai smartstay-backend.", file=sys.stderr)
+        print(
+            "\nLenh khong thanh cong. Xem loi phia tren; neu la Docker, chay docker compose ps -a tai smartstay-backend.",
+            file=sys.stderr,
+        )
         return exc.returncode if exc.returncode > 0 else 1
     except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         print("\nLOI: " + str(exc), file=sys.stderr)

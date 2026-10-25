@@ -21,9 +21,6 @@ import {
   Home as HomeIcon,
   ShieldCheck,
   Globe2,
-  Play,
-  Pause,
-  Square,
   Check,
   SlidersHorizontal,
   Server,
@@ -41,6 +38,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { createClient, mediaUrl, normalizeBase } from "./api.mjs";
+import AudioGuide from "./AudioGuide.jsx";
 import { fold, money, readStorage, writeStorage, mapUrl } from "./model.mjs";
 import { demoStays, offers, reviews, sampleBookings } from "./demo.mjs";
 import { copy } from "./i18n.mjs";
@@ -51,6 +49,7 @@ import {
   Checkout,
   CustomerBookings,
 } from "./BookingFeatures.jsx";
+import SmartStayControlCenter from "./SmartStayControlCenter.jsx";
 
 const today = () => {
   const d = new Date();
@@ -316,6 +315,13 @@ function Header() {
           </a>
         </nav>
         <div className="nav-actions">
+          <a
+            href={route === "/control" ? "#/rooms" : "#/control"}
+            className={"header-control-toggle " + (route === "/control" ? "to-classic" : "to-control")}
+            title={lang === "en" ? "Toggle interface" : "Chuyển đổi giao diện"}
+          >
+            {route === "/control" ? (lang === "en" ? "Hotels" : "Đặt phòng") : (lang === "en" ? "SmartStay Control" : "Điều khiển")}
+          </a>
           <button
             className="icon-button search-shortcut"
             aria-label="Search hotels"
@@ -562,6 +568,277 @@ function ContentState({ children }) {
     );
   return children;
 }
+function HomeLocationMap() {
+  const { data, navigate, lang } = useApp();
+  // Vị trí mặc định Sài Gòn (TP. Hồ Chí Minh)
+  const [userLat, setUserLat] = useState(10.7769);
+  const [userLng, setUserLng] = useState(106.7009);
+  const [gpsActive, setGpsActive] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const [locMsg, setLocMsg] = useState(
+    lang === "en"
+      ? "Location: Ho Chi Minh City (Saigon) - 10.7769, 106.7009"
+      : "Vị trí của bạn: TP. Hồ Chí Minh (Sài Gòn) - 10.7769, 106.7009"
+  );
+  const [selectedStay, setSelectedStay] = useState(null);
+
+  useEffect(() => {
+    setLocMsg(
+      lang === "en"
+        ? `Location: Ho Chi Minh City (Saigon) - ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`
+        : `Vị trí của bạn: TP. Hồ Chí Minh (Sài Gòn) - ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`
+    );
+  }, [lang, userLat, userLng]);
+
+  const calcDist = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+    const R = 6371e3;
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c);
+  };
+
+  const getLiveLocation = () => {
+    setShowMap(true);
+    const saigonLat = 10.7769;
+    const saigonLng = 106.7009;
+
+    if (!navigator.geolocation) {
+      setUserLat(saigonLat);
+      setUserLng(saigonLng);
+      setGpsActive(true);
+      setMapKey((k) => k + 1);
+      setLocMsg(
+        lang === "en"
+          ? "Location: Ho Chi Minh City (Saigon) - 10.7769, 106.7009"
+          : "Vị trí của bạn: TP. Hồ Chí Minh (Sài Gòn) - 10.7769, 106.7009"
+      );
+      return;
+    }
+
+    setLocMsg(lang === "en" ? "Scanning GPS satellite location in Saigon..." : "Đang quét vị trí vệ tinh GPS tại Sài Gòn...");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserLat(lat);
+        setUserLng(lng);
+        setGpsActive(true);
+        setMapKey((k) => k + 1);
+        setLocMsg(
+          lang === "en"
+            ? `Your exact location: ${lat.toFixed(4)}, ${lng.toFixed(4)} (Saigon)`
+            : `Đã xác định đúng vị trí bạn đang đứng: ${lat.toFixed(4)}, ${lng.toFixed(4)} (Sài Gòn)`
+        );
+      },
+      (err) => {
+        setUserLat(saigonLat);
+        setUserLng(saigonLng);
+        setGpsActive(true);
+        setMapKey((k) => k + 1);
+        setLocMsg(
+          lang === "en"
+            ? "Your location: Ho Chi Minh City (Saigon) - 10.7769, 106.7009"
+            : "Vị trí của bạn: TP. Hồ Chí Minh (Sài Gòn) - 10.7769, 106.7009"
+        );
+      },
+      { enableHighAccuracy: true, timeout: 3000, maximumAge: 0 }
+    );
+  };
+
+  const staysWithDistance = useMemo(() => {
+    return (data || [])
+      .map((s) => ({
+        ...s,
+        dist: calcDist(userLat, userLng, Number(s.latitude), Number(s.longitude)),
+      }))
+      .sort((a, b) => a.dist - b.dist);
+  }, [data, userLat, userLng]);
+
+  const activeTarget = selectedStay || staysWithDistance[0];
+
+  return (
+    <section className="container" style={{ margin: "36px auto 16px", padding: "0 20px" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "14px", padding: "24px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: showMap ? "16px" : 0, borderBottom: showMap ? "1px solid #f3f4f6" : "none", paddingBottom: showMap ? "14px" : 0 }}>
+          <div>
+            <h2 style={{ fontSize: "20px", fontWeight: "700", margin: "0 0 4px", color: "#111827", fontFamily: "inherit" }}>
+              {lang === "en"
+                ? "Live Location Map & Nearest Properties"
+                : "Bản Đồ Định Vị Vị Trí Của Bạn & Các Nơi Lưu Trú Gần Nhất"}
+            </h2>
+            <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>
+              {lang === "en"
+                ? "Locate exactly where you are in Saigon and get direct directions to hotels & homestays."
+                : "Xác định bạn đang đứng ở đâu tại Sài Gòn và chỉ đường trực tiếp đến khách sạn / homestay."}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={getLiveLocation}
+              style={{
+                background: "#2563eb",
+                color: "#ffffff",
+                padding: "9px 18px",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                border: "none",
+              }}
+            >
+              {showMap
+                ? (lang === "en" ? "Update GPS Location" : "Cập nhật vị trí GPS")
+                : (lang === "en" ? "Get My Current GPS Location" : "Lấy vị trí GPS hiện tại của tôi")}
+            </button>
+            {showMap && (
+              <button
+                onClick={() => setShowMap(false)}
+                style={{
+                  background: "#f3f4f6",
+                  color: "#374151",
+                  padding: "9px 14px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  border: "1px solid #d1d5db",
+                }}
+              >
+                {lang === "en" ? "Hide Map" : "Đóng bản đồ"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showMap && (
+          <>
+            <div style={{ background: "#eff6ff", borderLeft: "4px solid #2563eb", padding: "10px 16px", borderRadius: "0 6px 6px 0", fontSize: "13px", color: "#1e40af", marginBottom: "18px", marginTop: "14px" }}>
+              <b>{lang === "en" ? "Status:" : "Trạng thái:"}</b> {locMsg}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
+              {/* Iframe Bản đồ Google Maps ghim đúng vị trí tọa độ */}
+              <div style={{ borderRadius: "10px", overflow: "hidden", border: "1px solid #d1d5db", minHeight: "380px", background: "#f3f4f6" }}>
+                <iframe
+                  key={mapKey}
+                  title={lang === "en" ? "Map of your current location" : "Bản đồ vị trí của bạn"}
+                  src={`https://maps.google.com/maps?q=${userLat},${userLng}&hl=${lang}&z=16&output=embed`}
+                  style={{ width: "100%", height: "100%", minHeight: "380px", border: 0 }}
+                  loading="lazy"
+                />
+              </div>
+
+              {/* Danh sách khách sạn lân cận */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: "#111827" }}>
+                  {lang === "en"
+                    ? `Nearest properties by distance (${staysWithDistance.length} places):`
+                    : `Khách sạn lân cận theo khoảng cách (${staysWithDistance.length} cơ sở):`}
+                </div>
+
+                <div style={{ maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingRight: "4px" }}>
+                  {staysWithDistance.slice(0, 5).map((stay) => {
+                    const isSelected = activeTarget?.id === stay.id;
+                    const inGeofence = stay.dist <= 30;
+                    return (
+                      <div
+                        key={stay.id}
+                        onClick={() => setSelectedStay(stay)}
+                        style={{
+                          padding: "12px 14px",
+                          border: isSelected ? "2px solid #2563eb" : "1px solid #e5e7eb",
+                          borderRadius: "8px",
+                          background: isSelected ? "#f8fafc" : "#ffffff",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                          <div>
+                            <h4 style={{ margin: "0 0 3px", fontSize: "15px", fontWeight: "700", color: "#111827" }}>
+                              {stay.name}
+                            </h4>
+                            <p style={{ margin: 0, fontSize: "12px", color: "#6b7280" }}>{stay.address}</p>
+                          </div>
+                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#2563eb", whiteSpace: "nowrap" }}>
+                            {stay.dist < 1000 ? `${stay.dist} m` : `${(stay.dist / 1000).toFixed(1)} km`}
+                          </span>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                          {inGeofence ? (
+                            <span style={{ fontSize: "11px", fontWeight: "600", color: "#059669", background: "#ecfdf5", padding: "2px 8px", borderRadius: "4px" }}>
+                              {lang === "en" ? "Inside perimeter (30m)" : "Đã trong khuôn viên (30m)"}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                              {lang === "en" ? `${stay.dist - 30}m from Geofence` : `Cách Geofence ${stay.dist - 30}m`}
+                            </span>
+                          )}
+
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${stay.latitude},${stay.longitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: "600",
+                              color: "#2563eb",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            {lang === "en" ? "Google Maps Directions" : "Chỉ đường Google Maps"}
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {activeTarget && (
+                  <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "8px", border: "1px solid #e5e7eb", marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                    <div>
+                      <span style={{ fontSize: "13px", color: "#374151" }}>
+                        {lang === "en" ? "Selected property: " : "Khách sạn đang chọn: "}<b>{activeTarget.name}</b>
+                      </span>
+                      <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                        {lang === "en" ? "Distance: " : "Khoảng cách: "}<b>{activeTarget.dist < 1000 ? `${activeTarget.dist} m` : `${(activeTarget.dist / 1000).toFixed(1)} km`}</b>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        onClick={() => navigate("/rooms/" + activeTarget.id)}
+                        style={{ background: "#ffffff", border: "1px solid #d1d5db", padding: "7px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+                      >
+                        {lang === "en" ? "View Room Details" : "Xem Chi Tiết Phòng"}
+                      </button>
+                      <button
+                        onClick={() => navigate("/control")}
+                        style={{ background: "#2563eb", color: "#ffffff", border: "none", padding: "7px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+                      >
+                        {lang === "en" ? "Listen to Audio Directions" : "Nghe Thuyết Minh Dẫn Đường"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function HomePage() {
   const {
     t,
@@ -595,6 +872,9 @@ function HomePage() {
           <MapPin size={13} /> A little closer to your perfect escape
         </span>
       </section>
+
+      {/* Bản Đồ Vị Trí Của Bạn & Khách Sạn Lân Cận */}
+      <HomeLocationMap />
       <section className="featured-section" id="hotels">
         <div className="container">
           <div className="section-heading centered">
@@ -996,180 +1276,6 @@ function RoomsPage() {
     </main>
   );
 }
-function AudioGuide({ poi, language, setLanguage }) {
-  const { connection, t, toast } = useApp();
-  const [playing, setPlaying] = useState(false),
-    [paused, setPaused] = useState(false),
-    [audioError, setAudioError] = useState("");
-  const audio = useRef(null),
-    utterance = useRef(null);
-  const audioSrc = poi.audio_url
-    ? mediaUrl(poi.audio_url, connection.base)
-    : null;
-  function stop() {
-    audio.current?.pause();
-    if (audio.current) audio.current.currentTime = 0;
-    window.speechSynthesis?.cancel();
-    setPlaying(false);
-    setPaused(false);
-  }
-  useEffect(() => {
-    stop();
-    setAudioError("");
-    return () => {
-      audio.current?.pause();
-      window.speechSynthesis?.cancel();
-    };
-  }, [poi.id, language, audioSrc]);
-  async function play() {
-    if (playing && !paused) {
-      if (audioSrc) audio.current.pause();
-      else window.speechSynthesis?.pause();
-      setPaused(true);
-      return;
-    }
-    if (paused) {
-      if (audioSrc)
-        await audio.current
-          .play()
-          .catch(() => setAudioError("Unable to play recording."));
-      else window.speechSynthesis?.resume();
-      setPaused(false);
-      return;
-    }
-    if (audioSrc) {
-      try {
-        await audio.current.play();
-        setPlaying(true);
-      } catch {
-        setAudioError("This recording could not be played. Please try again.");
-      }
-      return;
-    }
-    if (!("speechSynthesis" in window)) {
-      setAudioError(
-        "Read-aloud is not supported in this browser. The text guide is available below.",
-      );
-      return;
-    }
-    const resolved = poi.resolved_lang || poi.language || "vi";
-    const u = new SpeechSynthesisUtterance(poi.name + ". " + poi.description);
-    u.lang =
-      { vi: "vi-VN", en: "en-US", ja: "ja-JP", zh: "zh-CN", ko: "ko-KR" }[
-        resolved
-      ] || resolved;
-    const voice = window.speechSynthesis
-      .getVoices()
-      .find((v) => v.lang.toLowerCase().startsWith(resolved));
-    if (voice) u.voice = voice;
-    u.rate = 0.92;
-    u.onend = () => {
-      setPlaying(false);
-      setPaused(false);
-    };
-    u.onerror = (e) => {
-      setPlaying(false);
-      if (!["canceled", "interrupted"].includes(e.error))
-        setAudioError(
-          "No suitable browser voice is available. Please use the text guide.",
-        );
-    };
-    utterance.current = u;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-    setPlaying(true);
-  }
-  return (
-    <section className="audio-guide">
-      <div className="audio-guide-title">
-        <span className="headphone-icon">
-          <Headphones size={21} />
-        </span>
-        <div>
-          <h3>{t.listen}</h3>
-          <p>{t.listenSub}</p>
-        </div>
-        <label className="audio-language">
-          <Globe2 size={16} />
-          <select
-            aria-label="Narration language"
-            value={language}
-            onChange={(e) => {
-              stop();
-              setLanguage(e.target.value);
-            }}
-          >
-            <option value="en">English</option>
-            <option value="vi">Tiếng Việt</option>
-            <option value="zh">中文</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-          </select>
-        </label>
-      </div>
-      <div className="audio-control-row">
-        <button className="button button-blue" onClick={play}>
-          {playing && !paused ? (
-            <Pause size={15} />
-          ) : (
-            <Play size={15} fill="currentColor" />
-          )}
-          {playing && !paused ? t.pause : t.play}
-        </button>
-        {playing && (
-          <button className="icon-button" aria-label={t.stop} onClick={stop}>
-            <Square size={15} />
-          </button>
-        )}
-        <span>
-          {audioSrc
-            ? "Property recording"
-            : connection.mode === "demo"
-              ? "Browser voice preview"
-              : "Browser read-aloud · no recording yet"}
-        </span>
-        <div
-          className={
-            "waveform " + (playing && !paused ? "waveform-playing" : "")
-          }
-        >
-          {Array.from({ length: 24 }, (_, i) => (
-            <i
-              key={i}
-              style={{
-                height: 8 + ((i * 7) % 22) + "px",
-                animationDelay: i * 0.07 + "s",
-              }}
-            />
-          ))}
-        </div>
-      </div>
-      {poi.language !== language && (
-        <p className="guide-note">
-          This translation is not available yet. Showing{" "}
-          {poi.language?.toUpperCase()} content.
-        </p>
-      )}
-      {audioError && (
-        <p className="form-error" role="alert">
-          {audioError}
-        </p>
-      )}
-      {audioSrc && (
-        <audio
-          ref={audio}
-          src={audioSrc}
-          onEnded={() => setPlaying(false)}
-          onError={() => {
-            setPlaying(false);
-            setAudioError("Recording is unavailable.");
-          }}
-          preload="none"
-        />
-      )}
-    </section>
-  );
-}
 function DetailPage({ id }) {
   const {
     t,
@@ -1507,6 +1613,7 @@ function DetailPage({ id }) {
             poi={poi}
             language={narration}
             setLanguage={setNarration}
+            onPrepared={setPoi}
           />
           <section className="room-options">
             <h3>{t.rooms}</h3>
@@ -2376,6 +2483,8 @@ export default function App() {
       )
     ) : path === "/admin" ? (
       <AdminDashboard />
+    ) : path === "/control" ? (
+      <SmartStayControlCenter onSwitchToClassic={() => navigate("/rooms")} />
     ) : path.startsWith("/rooms/") ? (
       <DetailPage key={path} id={decodeURIComponent(path.split("/")[2])} />
     ) : (

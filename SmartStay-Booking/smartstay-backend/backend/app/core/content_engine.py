@@ -1,5 +1,5 @@
-"""Content implementation moved to app.content.service and app.content.sync.
+"""Content services live in app.content; there is no in-memory storage fallback."""
 
-The former RAM-backed db helpers and fake transaction mode were retired.
-Use the FastAPI routes or the transaction-aware application services.
-"""
+from app.content.service import haversine
+
+__all__ = ["haversine"]

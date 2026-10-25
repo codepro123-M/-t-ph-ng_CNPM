@@ -143,6 +143,10 @@ async def replace_poi(
     await queue_cleanup(set(poi["images"]) - set(payload.images), session)
     changed_text = any(poi[field] != data[field] for field in TEXT_FIELDS)
     if changed_text:
+        if poi.get("audio_asset_id"):
+            await queue_cleanup(
+                [poi["audio_asset_id"]], session, reason="source_text_changed"
+            )
         old = (
             await get_db()["poi_localizations"]
             .find({"poi_id": str(poi["_id"])}, session=session)
@@ -170,6 +174,10 @@ async def replace_poi(
             kind="audio",
             publish=True,
         )
+        if poi.get("audio_asset_id"):
+            await touch_assets(
+                [poi["audio_asset_id"]], session, kind="audio", publish=True
+            )
     version, stamp = await next_version(session)
     changes = data | {
         "owner_id": new_owner,
@@ -178,6 +186,7 @@ async def replace_poi(
         "source_revision": poi["source_revision"] + int(changed_text),
         "updated_at": stamp,
         "admin_note": admin_note,
+        "audio_asset_id": None if changed_text else poi.get("audio_asset_id"),
     }
     result = await get_db()["pois"].update_one(
         {"_id": poi["_id"], "revision": expected_revision},
@@ -379,9 +388,15 @@ async def delete_poi(poi_id, actor):
             .find({"poi_id": poi_id, "status": "pending"}, session=session)
             .to_list(length=None)
         )
-        assets = list(poi["images"]) + [
-            row["audio_asset_id"] for row in localizations if row.get("audio_asset_id")
-        ]
+        assets = (
+            list(poi["images"])
+            + ([poi["audio_asset_id"]] if poi.get("audio_asset_id") else [])
+            + [
+                row["audio_asset_id"]
+                for row in localizations
+                if row.get("audio_asset_id")
+            ]
+        )
         for row in pending:
             assets.extend(row["payload"]["images"])
         await queue_cleanup(assets, session, reason="poi_deleted")

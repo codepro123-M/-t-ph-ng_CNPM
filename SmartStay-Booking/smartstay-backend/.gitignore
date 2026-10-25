@@ -11,3 +11,7 @@ backend/app/static/maps/packs/*
 # Local HTTPS CA exports (never commit certificate material).
 dev-certs/
 backend/runtime_data/content-media/
+
+repair-backups/
+
+backend/runtime_data/audio_cache/

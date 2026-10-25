@@ -1,0 +1,10 @@
+# Preserve byte-stable source hashes on Windows and Linux.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.mp3 binary
+*.zip binary

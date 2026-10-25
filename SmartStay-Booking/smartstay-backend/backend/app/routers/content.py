@@ -1,4 +1,4 @@
-"""Legacy import path; the active implementation uses MongoDB-backed services."""
+"""Legacy import path for the canonical MongoDB-backed router."""
 
 from app.content.router import router
 

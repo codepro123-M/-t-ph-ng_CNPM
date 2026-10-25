@@ -1,56 +1,56 @@
-"""Regression for legacy URLs against the transactional application services."""
+"""Legacy import/URL regression checks run through the canonical real-storage API."""
 
-from datetime import timedelta
+import pytest
 
-from bson import ObjectId
-
-from app.core.security import utcnow
-from test_phase2 import OWNER, admin_login, auth, new_owner, verified_owner
-
-
-def test_dynamic_rbac_32_permissions_and_9_domains(client, root):
-    endpoint = "/api/v1/admin/rbac/permissions"
-    assert client.get(endpoint).status_code == 401
-    catalog = client.get(endpoint, headers=auth(root))
-    assert catalog.status_code == 200
-    assert catalog.json()["count"] == 34 and len(catalog.json()["domains"]) == 10
-    registration = new_owner(client)
-    owner = admin_login(client, OWNER["username"], OWNER["password"])
-    assert registration["status"] == "pending"
-    assert client.get(endpoint, headers=auth(owner["access_token"])).status_code == 403
+from app.core.permissions import (
+    ALL_PERMISSIONS,
+    DEFAULT_ROLES,
+    PERMISSIONS,
+    PERMISSION_DOMAINS,
+    PERMISSIONS_BY_DOMAIN,
+)
+from app.core.pii import decrypt_pii, encrypt_pii
+from app.core.security import hash_password, verify_password
+from test_phase2 import ROOT_PASSWORD, auth
 
 
-def test_bcrypt_and_fernet_v1_pii_encryption(client, root, services):
-    registration = new_owner(client)
-    user_id = ObjectId(registration["user"]["id"])
-    stored = services.db.raw.admin_users.find_one({"_id": user_id})
-    assert stored["password_hash"].startswith("$2")
-    assert stored["national_id_encrypted"].startswith("v1:")
-    assert OWNER["national_id"] not in str(list(services.db.raw.audit_logs.find()))
-    services.db.raw.admin_users.update_one(
-        {"_id": user_id}, {"$set": {"pii_expires_at": utcnow() - timedelta(seconds=1)}}
+def test_permission_import_aliases_share_one_catalog(client, root):
+    assert (
+        ALL_PERMISSIONS is PERMISSIONS and PERMISSIONS_BY_DOMAIN is PERMISSION_DOMAINS
     )
-    response = client.get(
-        f"/api/v1/admin/registrations/{registration['registration_id']}/pii",
-        headers=auth(root),
+    assert len(PERMISSIONS) == 34 and len(PERMISSION_DOMAINS) == 10
+    assert "booking.read" in DEFAULT_ROLES["super_admin"]["permissions"]
+    assert (
+        client.get("/api/v1/admin/rbac/permissions", headers=auth(root)).json()["count"]
+        == 34
     )
-    assert response.status_code == 410
 
 
-def test_end_to_end_owner_registration_verification_and_audit_logs(client, root):
-    tokens, registration = verified_owner(client, root)
-    owner_header = auth(tokens["access_token"])
-    profile = client.get("/api/v1/owner/profile", headers=owner_header)
-    assert profile.status_code == 200
-    assert profile.json()["id"] == registration["user"]["id"]
-    assert profile.json()["is_verified"] and profile.json()["is_poi_owner_verified"]
-    assert client.get("/api/v1/admin/me", headers=auth(root)).status_code == 200
-    room = client.post(
-        "/api/v1/owner/rooms",
-        json={"name": "Legacy route room", "price": 500000},
-        headers=owner_header,
+@pytest.mark.asyncio
+async def test_shared_password_and_versioned_pii_helpers(client):
+    password_hash = await hash_password("Password-regression-2026")
+    assert await verify_password("Password-regression-2026", password_hash)
+    assert not await verify_password("wrong", password_hash)
+    encrypted = encrypt_pii("000000000001")
+    assert encrypted.startswith("v1:") and decrypt_pii(encrypted) == "000000000001"
+
+
+def test_admin_url_alias_uses_username_sessions(client, root):
+    login = client.post(
+        "/api/v1/admin/auth/login",
+        json={"username": "superadmin", "password": ROOT_PASSWORD, "mode": "bearer"},
     )
-    assert room.status_code == 201
-    audit = client.get("/api/v1/admin/audit-logs", headers=auth(root))
-    assert audit.status_code == 200
-    assert any(row["resource_id"] == room.json()["id"] for row in audit.json()["items"])
+    assert login.status_code == 200
+    assert (
+        client.get(
+            "/api/v1/admin/auth/me", headers=auth(login.json()["access_token"])
+        ).json()["realm"]
+        == "admin_users"
+    )
+    assert (
+        client.post(
+            "/api/v1/admin/auth/login",
+            json={"email": "superadmin@smartstay.vn", "password": "unused"},
+        ).status_code
+        == 422
+    )

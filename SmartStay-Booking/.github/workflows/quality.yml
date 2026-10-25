@@ -1,0 +1,137 @@
+name: SmartStay Full-stack CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend-quality-and-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smartstay-backend
+    strategy:
+      matrix:
+        media_backend: [local, s3]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install MP3 validation tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install project dependencies and test tools
+        run: pip install -r backend/requirements-test.txt
+
+      - name: Run Ruff quality check on Backend
+        run: ruff check ./backend ./scripts ./AP_DUNG_BAN_SUA.py
+
+      - name: Run API and regression tests
+        run: python -m pytest -q
+
+      - name: Create .env from .env.example
+        run: cp .env.example .env
+
+      - name: Enable local S3 stack
+        if: matrix.media_backend == 's3'
+        run: python scripts/configure_local_s3.py
+
+      - name: Configure Phase 2 secrets and HTTPS
+        run: python scripts/configure_phase2.py
+
+      - name: Build and start Docker Compose stack
+        run: docker compose up -d --build
+
+      - name: Wait for /health/ready (4-Tier Lifespan & Replica Set check)
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8001/health/ready; then
+              echo -e "\nBackend is READY!"
+              exit 0
+            fi
+            echo "Waiting for backend readiness ($i/30)..."
+            sleep 2
+          done
+          docker compose logs backend
+          exit 1
+
+      - name: Verify Startup Network Probe Endpoints
+        run: |
+          curl -fsS http://localhost:8001/api/v1/audio/languages
+          curl -fsS http://localhost:8001/api/v1/maps/offline-options
+
+      - name: Verify authentication against real MongoDB
+        run: python scripts/smoke_auth.py --base-url http://127.0.0.1:8001
+
+      - name: Export the development HTTPS CA
+        run: |
+          mkdir -p dev-certs
+          for i in {1..30}; do
+            if docker compose cp gateway:/data/caddy/pki/authorities/local/root.crt ./dev-certs/root.crt; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs gateway
+          exit 1
+
+      - name: Verify Phase 2 against real MongoDB, Redis and HTTPS
+        run: python scripts/smoke_phase2.py --cookie-url https://localhost:8443 --ca-file dev-certs/root.crt
+
+      - name: Verify Phase 3 content, geo, delta sync and media
+        run: python scripts/smoke_phase3.py
+
+      - name: Verify booking concurrency and rollback against real MongoDB
+        run: docker compose exec -T backend python integration/check_booking_replica.py
+
+      - name: Verify media backend readiness
+        env:
+          EXPECTED_MEDIA_BACKEND: ${{ matrix.media_backend }}
+        run: |
+          python - <<'PY'
+          import os
+          import httpx
+          response = httpx.get('http://127.0.0.1:8001/health/ready', trust_env=False)
+          response.raise_for_status()
+          result = response.json()
+          assert result['media_backend'] == os.environ['EXPECTED_MEDIA_BACKEND']
+          assert result['media_ready'] is True
+          PY
+
+      - name: Force a real S3 write-read-delete probe
+        if: matrix.media_backend == 's3'
+        run: >-
+          docker compose exec -T backend python -c
+          "import asyncio; from app.core.media_storage import media_storage;
+          asyncio.run(media_storage.check_backend_health(force=True)); print('S3 probe passed')"
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose down -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: quickstay-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Check update integrity and updater regression tests
+        working-directory: .
+        run: |
+          python KIEM_TRA_GOI.py
+          python -m unittest discover -s tests -v
