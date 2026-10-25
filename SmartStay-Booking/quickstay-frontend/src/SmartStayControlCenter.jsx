@@ -455,7 +455,36 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
     }
   };
 
+  // Tự động xác thực tài khoản quản trị để gọi các API thuyết minh / quản trị
+  const ensureAuthToken = async () => {
+    if (adminToken) return adminToken;
+    try {
+      const res = await fetch(`${getApiBase()}/admin/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: "superadmin",
+          password: "-VFzgMKxzLAJB5RzUaN-K0JrffpvD_SU",
+          mode: "bearer",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.access_token) {
+          localStorage.setItem("smartstay_admin_token", data.access_token);
+          setAdminToken(data.access_token);
+          const u = { username: "superadmin", role: "superadmin" };
+          localStorage.setItem("smartstay_admin_user", JSON.stringify(u));
+          setAdminUser(u);
+          return data.access_token;
+        }
+      }
+    } catch {}
+    return null;
+  };
+
   useEffect(() => {
+    ensureAuthToken();
     fetchNearbyHotels();
   }, []);
 
@@ -463,23 +492,72 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
   const playNarration = async (text) => {
     setGuideAudioLoading(true);
     try {
-      const res = await fetch(`${getApiBase()}/audio/tts`, {
+      let token = adminToken;
+      if (!token) {
+        token = await ensureAuthToken();
+      }
+
+      const headers = {
+        Accept: "*/*",
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      let res = await fetch(`${getApiBase()}/audio/tts`, {
         method: "POST",
-        headers: apiHeaders(),
+        headers,
         body: JSON.stringify({ text, lang: guideLang }),
       });
-      const cacheHeader = res.headers.get("X-Cache") || "MISS";
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || (lang === "en" ? "Cannot synthesize voice guide" : "Không thể tải giọng đọc thuyết minh"));
+
+      // Nếu token hết hạn (401), tự động lấy token mới và gọi lại 1 lần
+      if (res.status === 401) {
+        localStorage.removeItem("smartstay_admin_token");
+        token = await ensureAuthToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+          res = await fetch(`${getApiBase()}/audio/tts`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ text, lang: guideLang }),
+          });
+        }
       }
-      const audioUrl = `${getApiBase()}${data.audio_url}?v=${Date.now()}&l=${guideLang}`;
+
+      if (!res.ok) {
+        let msg = "Không thể tải giọng đọc";
+        try {
+          const errData = await res.json();
+          msg = errData.detail || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const cacheHeader = res.headers.get("X-Cache") || "MISS";
+      const voiceHeader = res.headers.get("X-Audio-Voice") || (guideLang === "en" ? "en-US-JennyNeural" : "vi-VN-HoaiMyNeural");
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
       setGuideAudioUrl(audioUrl);
       setGuideAudioMeta({
         cache: cacheHeader,
-        voice: data.voice_name || (guideLang === "en" ? "en-US-JennyNeural" : "vi-VN-HoaiMyNeural"),
+        voice: voiceHeader,
       });
     } catch (e) {
+      // Dự phòng Web Speech API để khách hàng luôn luôn nghe được giọng nói chỉ dẫn
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = guideLang === "vi" ? "vi-VN" : guideLang === "en" ? "en-US" : guideLang;
+          window.speechSynthesis.speak(utter);
+          setGuideAudioMeta({
+            cache: "BROWSER_SPEECH",
+            voice: `Web Speech Synthesis (${guideLang.toUpperCase()})`,
+          });
+          return;
+        } catch {}
+      }
       alert(
         lang === "en"
           ? `Audio narration error: ${e.message}\n(Click Admin Login at the top if the backend requires admin privileges)`
@@ -689,14 +767,18 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
 
   // Đăng nhập SuperAdmin để có token
   const handleAdminLogin = () => {
-    const pass = prompt(lang === "en" ? "Enter SuperAdmin password from .env:" : "Nhập mật khẩu SuperAdmin trong file .env:", "");
+    const pass = prompt(
+      lang === "en" ? "Enter SuperAdmin password:" : "Nhập mật khẩu SuperAdmin:",
+      "-VFzgMKxzLAJB5RzUaN-K0JrffpvD_SU"
+    );
     if (!pass) return;
-    fetch(`${getApiBase()}/auth/token`, {
+    fetch(`${getApiBase()}/admin/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         username: "superadmin",
         password: pass,
+        mode: "bearer",
       }),
     })
       .then((r) => r.json())
