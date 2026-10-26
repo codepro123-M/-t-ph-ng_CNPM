@@ -322,6 +322,14 @@ function Header() {
           >
             {route === "/control" ? (lang === "en" ? "Hotels" : "Đặt phòng") : (lang === "en" ? "SmartStay Control" : "Điều khiển")}
           </a>
+          <a
+            href="#/control?tab=qr"
+            className="header-control-toggle"
+            style={{ background: "#f8fafc", color: "#1e40af", borderColor: "#bfdbfe" }}
+            title={lang === "en" ? "QR Code & Check-in Dashboard" : "Mã QR & Giám sát Check-in"}
+          >
+            {lang === "en" ? "QR Code" : "Mã QR"}
+          </a>
           <button
             className="icon-button search-shortcut"
             aria-label="Search hotels"
@@ -2356,6 +2364,36 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
+  useEffect(() => {
+    const href = window.location.href;
+    if (href.includes("ref=qr") || href.includes("source=qr")) {
+      const match = href.match(/stay=([^&#]+)/) || href.match(/rooms\/([^?&#]+)/);
+      const stayId = match ? match[1] : "saigon-riverside";
+      const stayName = stayId.includes("central")
+        ? "SmartStay Central Ben Thanh Villa"
+        : stayId.includes("heritage")
+        ? "SmartStay Landmark Heritage Villa"
+        : "SmartStay Saigon Riverside Hotel";
+
+      fetch("/api/analytics/qr-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stay_id: stayId,
+          stay_name: stayName,
+          device: navigator.userAgent,
+          url: window.location.hash || window.location.pathname,
+          action: "Khách quét mã QR từ điện thoại di động truy cập trang",
+        }),
+      }).catch(() => {});
+
+      toast(
+        lang === "en"
+          ? "Welcome! You scanned the QR Code and connected to SmartStay."
+          : "Chào mừng quý khách! Quý khách đã kết nối thành công qua mã QR."
+      );
+    }
+  }, []);
   const navigate = (path) => {
     if ((window.location.hash.slice(1) || "/") === path)
       window.scrollTo({ top: 0, behavior: "smooth" });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useApp } from "./context.jsx";
 import "./control-center.css";
 
@@ -16,6 +17,7 @@ const UI_TEXT = {
     tab3: "3. Thuyết minh & Gói Offline (audio)",
     tab4: "4. Bản đồ, Fallback & Làm nóng (content)",
     tab5: "5. Cổng Kiểm soát, Chủ nhà & Phân quyền (admin)",
+    tab6: "6. Mã QR & Giám Sát Khách (Dashboard)",
     sec1Title: "Mục 1: Định vị GPS Khách Hàng & Dẫn Đường Đến Khách Sạn",
     sec1Sub: "Tự động tính khoảng cách và kích hoạt vùng Geofence trong bán kính 30 mét",
     getGpsBtn: "Lấy vị trí GPS hiện tại của tôi",
@@ -111,6 +113,27 @@ const UI_TEXT = {
     rbacTitle: "Ma Trận 32 Quyền / 9 Miền RBAC (/admin/permissions)",
     colDomain: "Miền quyền",
     colPerms: "Danh mục quyền chi tiết",
+    // Tab 6: QR Code
+    qrDashboardTitle: "Mã QR Truy Cập & Giám Sát Tình Hình Khách Hàng",
+    qrDashboardSub: "Khách quét mã QR để truy cập trực tiếp vào trang web / phòng khách sạn, tình hình quét và truy cập được cập nhật thời gian thực vào Dashboard",
+    qrCardTotal: "Tổng lượt quét QR",
+    qrCardToday: "Khách quét hôm nay",
+    qrCardActive: "Đang trực tuyến",
+    qrCardDevice: "Thiết bị hàng đầu",
+    qrGenTitle: "Bộ Tạo Mã QR Động & In Standee",
+    qrNetworkHost: "Địa chỉ mạng truy cập (Host):",
+    qrTargetDest: "Trang đích khi khách quét mã:",
+    qrSimulateBtn: "Mô Phỏng 1 Lượt Khách Quét Mã",
+    qrDownloadBtn: "Tải Mã QR (SVG)",
+    qrPrintBtn: "In Mã QR Đặt Bàn / Lễ Tân",
+    qrLogTitle: "Nhật Ký Tình Hình Quét Mã Thời Gian Thực",
+    qrClearBtn: "Xóa nhật ký",
+    qrColTime: "Thời gian",
+    qrColStay: "Cơ sở lưu trú",
+    qrColDevice: "Thiết bị",
+    qrColIp: "Địa chỉ IP",
+    qrColAction: "Hành động khách",
+    qrColStatus: "Tình trạng",
   },
   en: {
     systemTitle: "SmartStay Guidance & Management System",
@@ -123,6 +146,7 @@ const UI_TEXT = {
     tab3: "3. Audio Narration & Offline Pack (audio)",
     tab4: "4. Maps, Fallback & Warmup (content)",
     tab5: "5. Control Gate, Owner & RBAC (admin)",
+    tab6: "6. QR Code & Live Guest Monitor (Dashboard)",
     sec1Title: "Section 1: Customer GPS Geolocation & Hotel Navigation",
     sec1Sub: "Automatic distance calculation and 30-meter Geofence perimeter detection",
     getGpsBtn: "Get My Current GPS Location",
@@ -218,6 +242,27 @@ const UI_TEXT = {
     rbacTitle: "32 Permissions / 9 Domains RBAC Matrix (/admin/permissions)",
     colDomain: "Permission Domain",
     colPerms: "Detailed Permissions",
+    // Tab 6: QR Code
+    qrDashboardTitle: "QR Code Access & Real-Time Guest Monitor",
+    qrDashboardSub: "Guests scan the QR code to access the hotel/stay instantly, and scan activity updates in real-time on the Dashboard",
+    qrCardTotal: "Total QR Scans",
+    qrCardToday: "Today's Scans",
+    qrCardActive: "Active Visitors",
+    qrCardDevice: "Top Device",
+    qrGenTitle: "Dynamic QR Code Generator & Standee Print",
+    qrNetworkHost: "Network Host Access:",
+    qrTargetDest: "Destination Page upon Scan:",
+    qrSimulateBtn: "Simulate 1 QR Guest Scan",
+    qrDownloadBtn: "Download QR (SVG)",
+    qrPrintBtn: "Print Standee QR Code",
+    qrLogTitle: "Real-Time QR Scan Activity Log",
+    qrClearBtn: "Clear Logs",
+    qrColTime: "Timestamp",
+    qrColStay: "Property",
+    qrColDevice: "Device",
+    qrColIp: "IP Address",
+    qrColAction: "Guest Action",
+    qrColStatus: "Status",
   },
 };
 
@@ -226,7 +271,21 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
   const lang = appContext?.lang || "vi";
   const tr = UI_TEXT[lang] || UI_TEXT.vi;
 
-  const [activeTab, setActiveTab] = useState("guide"); // guide, i18n, audio, map, admin
+  const [activeTab, setActiveTab] = useState(() => {
+    return window.location.hash.includes("tab=qr") ? "qr" : "guide";
+  });
+
+  // State cho Tab QR & Giám sát khách hàng
+  const [qrHost, setQrHost] = useState("http://172.20.10.3:4173");
+  const [customHost, setCustomHost] = useState("");
+  const [qrTarget, setQrTarget] = useState("/#/?ref=qr");
+  const [qrStats, setQrStats] = useState({
+    total_scans: 2,
+    today_scans: 2,
+    active_visitors: 2,
+    top_device: "Mobile",
+    recent_scans: [],
+  });
 
   // Quản trị viên token
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("smartstay_admin_token") || "");
@@ -798,6 +857,111 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
       .catch((err) => alert(lang === "en" ? "Login error: " + err.message : "Lỗi đăng nhập: " + err.message));
   };
 
+  // Lấy dữ liệu thống kê quét mã QR và tình hình khách hàng
+  const fetchQrStats = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/analytics/qr-stats`);
+      if (res.ok) {
+        const data = await res.json();
+        setQrStats(data);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchQrStats();
+    const timer = setInterval(fetchQrStats, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleSimulateScan = async () => {
+    try {
+      const stay = selectedHotel?.name || "SmartStay Central Ben Thanh Villa";
+      const dev = navigator.userAgent.includes("Mobile") ? "Mobile (iPhone / Android)" : "Desktop / Laptop";
+      const res = await fetch(`${getApiBase()}/analytics/qr-scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stay_id: selectedHotel?.id || "saigon-central",
+          stay_name: stay,
+          device: dev,
+          action: lang === "en" ? "Simulated scan from Dashboard" : "Khách quét mã QR tại quầy tiếp tân",
+        }),
+      });
+      if (res.ok) {
+        fetchQrStats();
+      }
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+  };
+
+  const handleClearQrLogs = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/analytics/qr-clear`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        fetchQrStats();
+      }
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+  };
+
+  const effectiveHost = customHost.trim() || qrHost;
+  const computedQrUrl = `${effectiveHost}${qrTarget}`;
+
+  const handleDownloadQrSvg = () => {
+    const svgEl = document.getElementById("smartstay-qr-svg");
+    if (!svgEl) return;
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `smartstay-qr-${Date.now()}.svg`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrintQr = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const svgEl = document.getElementById("smartstay-qr-svg");
+    const svgHtml = svgEl ? svgEl.outerHTML : "";
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>SmartStay Standee QR Code</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 40px; margin: 0; background: #fff; }
+            .card { max-width: 420px; margin: 0 auto; border: 2px solid #1e3a8a; border-radius: 16px; padding: 36px 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+            h1 { color: #1e3a8a; font-size: 26px; margin: 0 0 6px 0; letter-spacing: 1px; font-weight: 800; }
+            .sub { color: #4b5563; font-size: 14px; margin: 0 0 24px 0; }
+            .qr-wrapper { margin: 20px auto; display: inline-block; padding: 14px; background: #fff; border-radius: 12px; border: 1px solid #d1d5db; }
+            .url { font-family: monospace; font-size: 13px; color: #4b5563; word-break: break-all; margin-top: 16px; padding: 6px 10px; background: #f3f4f6; border-radius: 6px; }
+            .footer { margin-top: 24px; font-size: 14px; color: #111827; font-weight: 700; border-top: 1px dashed #d1d5db; padding-top: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>SMARTSTAY</h1>
+            <div class="sub">${lang === "en" ? "Scan to view hotel amenities, GPS guide & instant check-in" : "Quét mã để xem phòng, định vị chỉ đường & thuyết minh đồ vật"}</div>
+            <div class="qr-wrapper">${svgHtml}</div>
+            <div class="url">${computedQrUrl}</div>
+            <div class="footer">${selectedHotel?.name || "SmartStay Saigon Hotel & Villa"}</div>
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="control-center-wrapper">
       {/* Header thanh gọn gàng */}
@@ -849,6 +1013,12 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
           onClick={() => setActiveTab("admin")}
         >
           {tr.tab5}
+        </button>
+        <button
+          className={`simple-tab-btn ${activeTab === "qr" ? "active" : ""}`}
+          onClick={() => setActiveTab("qr")}
+        >
+          {tr.tab6}
         </button>
       </div>
 
@@ -1407,6 +1577,193 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 6: MÃ QR TRUY CẬP & GIÁM SÁT TÌNH HÌNH KHÁCH HÀNG */}
+      {/* ======================================================== */}
+      {activeTab === "qr" && (
+        <div>
+          {/* TIÊU ĐỀ PHÂN KHU & THỐNG KÊ */}
+          <div className="simple-panel">
+            <div className="simple-panel-header">
+              <div>
+                <h2>{tr.qrDashboardTitle}</h2>
+                <span className="subtitle">{tr.qrDashboardSub}</span>
+              </div>
+              <button className="btn btn-blue" onClick={fetchQrStats}>
+                {lang === "en" ? "Refresh Dashboard" : "Cập nhật dữ liệu"}
+              </button>
+            </div>
+
+            {/* 4 THẺ THỐNG KÊ TỔNG QUAN */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "16px 20px" }}>
+                <div style={{ fontSize: "13px", color: "#64748b", fontWeight: "600", marginBottom: "6px" }}>{tr.qrCardTotal}</div>
+                <div style={{ fontSize: "28px", fontWeight: "800", color: "#1e3a8a" }}>{qrStats.total_scans ?? 0}</div>
+              </div>
+
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "16px 20px" }}>
+                <div style={{ fontSize: "13px", color: "#64748b", fontWeight: "600", marginBottom: "6px" }}>{tr.qrCardToday}</div>
+                <div style={{ fontSize: "28px", fontWeight: "800", color: "#059669" }}>{qrStats.today_scans ?? 0}</div>
+              </div>
+
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "16px 20px" }}>
+                <div style={{ fontSize: "13px", color: "#64748b", fontWeight: "600", marginBottom: "6px" }}>{tr.qrCardActive}</div>
+                <div style={{ fontSize: "28px", fontWeight: "800", color: "#d97706" }}>{qrStats.active_visitors ?? 0}</div>
+              </div>
+
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "16px 20px" }}>
+                <div style={{ fontSize: "13px", color: "#64748b", fontWeight: "600", marginBottom: "6px" }}>{tr.qrCardDevice}</div>
+                <div style={{ fontSize: "20px", fontWeight: "700", color: "#334155", marginTop: "6px" }}>{qrStats.top_device || "Mobile"}</div>
+              </div>
+            </div>
+
+            {/* BỘ TẠO MÃ QR ĐỘNG & TÙY CHỌN MẠNG */}
+            <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px", alignItems: "start" }}>
+              {/* Cột trái: Cài đặt Host & Đường dẫn */}
+              <div>
+                <h3 style={{ fontSize: "16px", fontWeight: "700", margin: "0 0 16px 0", color: "#111827" }}>{tr.qrGenTitle}</h3>
+                
+                <div className="form-group" style={{ marginBottom: "14px" }}>
+                  <label>{tr.qrNetworkHost}</label>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+                    <button
+                      className={`btn ${qrHost === "http://172.20.10.3:4173" && !customHost ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => { setQrHost("http://172.20.10.3:4173"); setCustomHost(""); }}
+                    >
+                      Wi-Fi LAN (172.20.10.3)
+                    </button>
+                    <button
+                      className={`btn ${qrHost === "http://localhost:4173" && !customHost ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => { setQrHost("http://localhost:4173"); setCustomHost(""); }}
+                    >
+                      Localhost (127.0.0.1)
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={customHost}
+                    onChange={(e) => setCustomHost(e.target.value)}
+                    placeholder={lang === "en" ? "Or enter custom domain (e.g. https://myhotel.com)" : "Hoặc nhập tên miền tùy chỉnh (vd: https://khachsan.vn)"}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>{tr.qrTargetDest}</label>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <button
+                      className={`btn ${qrTarget === "/#/?ref=qr" ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => setQrTarget("/#/?ref=qr")}
+                    >
+                      {lang === "en" ? "Home (?ref=qr)" : "Trang chủ (?ref=qr)"}
+                    </button>
+                    <button
+                      className={`btn ${qrTarget === "/#/control?tab=guide" ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => setQrTarget("/#/control?tab=guide")}
+                    >
+                      {lang === "en" ? "GPS & Voice Guide" : "Chỉ đường GPS & Thuyết minh"}
+                    </button>
+                    <button
+                      className={`btn ${qrTarget === "/#/rooms" ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => setQrTarget("/#/rooms")}
+                    >
+                      {lang === "en" ? "Hotel Rooms" : "Danh sách phòng"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="notice-box" style={{ wordBreak: "break-all" }}>
+                  <b>URL:</b> <a href={computedQrUrl} target="_blank" rel="noreferrer" style={{ color: "#1d4ed8" }}>{computedQrUrl}</a>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "12px" }}>
+                  <button className="btn btn-blue" onClick={handleSimulateScan}>
+                    {tr.qrSimulateBtn}
+                  </button>
+                  <button className="btn btn-green" onClick={handlePrintQr}>
+                    {tr.qrPrintBtn}
+                  </button>
+                  <button className="btn btn-gray" onClick={handleDownloadQrSvg}>
+                    {tr.qrDownloadBtn}
+                  </button>
+                </div>
+              </div>
+
+              {/* Cột phải: Khung hiển thị Mã QR */}
+              <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "24px", textAlign: "center" }}>
+                <div style={{ background: "#ffffff", padding: "16px", borderRadius: "8px", display: "inline-block", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
+                  <QRCodeSVG
+                    id="smartstay-qr-svg"
+                    value={computedQrUrl}
+                    size={200}
+                    level="H"
+                    includeMargin={true}
+                  />
+                </div>
+                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "12px" }}>
+                  {lang === "en"
+                    ? "Guests scanning this QR code with their mobile camera will be redirected to the target page and logged automatically."
+                    : "Khách dùng camera điện thoại quét mã này sẽ mở trực tiếp trang web và ghi nhận vào bảng nhật ký bên dưới."}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* BẢNG NHẬT KÝ QUÉT MÃ THỜI GIAN THỰC */}
+          <div className="simple-panel">
+            <div className="simple-panel-header">
+              <div>
+                <h2>{tr.qrLogTitle}</h2>
+                <span className="subtitle">
+                  {lang === "en" ? "Real-time automatic sync every 3 seconds" : "Tự động đồng bộ mỗi 3 giây"}
+                </span>
+              </div>
+              <button className="btn btn-gray" onClick={handleClearQrLogs}>
+                {tr.qrClearBtn}
+              </button>
+            </div>
+
+            <div className="table-container">
+              <table className="simple-table">
+                <thead>
+                  <tr>
+                    <th>{tr.qrColTime}</th>
+                    <th>{tr.qrColStay}</th>
+                    <th>{tr.qrColDevice}</th>
+                    <th>{tr.qrColIp}</th>
+                    <th>{tr.qrColAction}</th>
+                    <th>{tr.qrColStatus}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(!qrStats.recent_scans || qrStats.recent_scans.length === 0) ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", color: "#6b7280", padding: "20px" }}>
+                        {lang === "en" ? "No QR scan activity recorded yet." : "Chưa có lượt quét QR nào được ghi nhận."}
+                      </td>
+                    </tr>
+                  ) : (
+                    qrStats.recent_scans.map((s, idx) => (
+                      <tr key={idx}>
+                        <td><code>{s.scanned_at || "Vừa xong"}</code></td>
+                        <td><b>{s.stay_name || "SmartStay Saigon Riverside"}</b></td>
+                        <td>{s.device || "Mobile"}</td>
+                        <td><code>{s.ip || "127.0.0.1"}</code></td>
+                        <td>{s.action || "Quét mã QR truy cập hệ thống"}</td>
+                        <td>
+                          <span className="tag tag-green">
+                            {lang === "en" ? "Connected" : "Đã kết nối"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
