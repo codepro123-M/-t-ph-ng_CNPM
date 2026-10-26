@@ -971,6 +971,16 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
           <p>{tr.systemSub}</p>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <a
+            className="btn btn-gray"
+            href="http://localhost:8081"
+            target="_blank"
+            rel="noreferrer"
+            style={{ textDecoration: "none" }}
+            title={lang === "en" ? "Open MongoDB Web Manager" : "Mở giao diện quản lý cơ sở dữ liệu MongoDB"}
+          >
+            {lang === "en" ? "Database UI" : "Bảng Database"}
+          </a>
           <button className="btn btn-gray" onClick={handleAdminLogin}>
             {adminUser ? `${tr.admin} ${adminUser.username}` : tr.adminLogin}
           </button>
