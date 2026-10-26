@@ -2366,7 +2366,13 @@ export default function App() {
   }, [lang]);
   useEffect(() => {
     const href = window.location.href;
-    if (href.includes("ref=qr") || href.includes("source=qr")) {
+    const hostname = window.location.hostname;
+    const isLanGuest = hostname !== "localhost" && hostname !== "127.0.0.1";
+    const hasQrParam = href.includes("ref=qr") || href.includes("source=qr");
+    const alreadyLogged = sessionStorage.getItem("smartstay_qr_logged");
+
+    if ((hasQrParam || isLanGuest) && !alreadyLogged) {
+      sessionStorage.setItem("smartstay_qr_logged", "1");
       const match = href.match(/stay=([^&#]+)/) || href.match(/rooms\/([^?&#]+)/);
       const stayId = match ? match[1] : "saigon-riverside";
       const stayName = stayId.includes("central")
@@ -2375,22 +2381,32 @@ export default function App() {
         ? "SmartStay Landmark Heritage Villa"
         : "SmartStay Saigon Riverside Hotel";
 
+      const devDesc = navigator.userAgent.includes("Mobile")
+        ? `Mobile (${navigator.userAgent.includes("iPhone") ? "iPhone" : "Android"})`
+        : navigator.userAgent.includes("Mac")
+        ? "MacBook / macOS"
+        : navigator.userAgent.includes("Windows")
+        ? "Windows PC / Laptop"
+        : navigator.userAgent.slice(0, 35);
+
       fetch("/api/analytics/qr-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stay_id: stayId,
           stay_name: stayName,
-          device: navigator.userAgent,
+          device: devDesc,
           url: window.location.hash || window.location.pathname,
-          action: "Khách quét mã QR từ điện thoại di động truy cập trang",
+          action: hasQrParam
+            ? "Khách quét mã QR truy cập trang web"
+            : "Khách kết nối qua mạng nội bộ LAN / Wi-Fi",
         }),
       }).catch(() => {});
 
       toast(
         lang === "en"
-          ? "Welcome! You scanned the QR Code and connected to SmartStay."
-          : "Chào mừng quý khách! Quý khách đã kết nối thành công qua mã QR."
+          ? "Welcome! You connected to SmartStay successfully."
+          : "Chào mừng quý khách! Quý khách đã kết nối thành công với SmartStay."
       );
     }
   }, []);

@@ -278,7 +278,7 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
   // State cho Tab QR & Giám sát khách hàng
   const [qrHost, setQrHost] = useState("http://172.20.10.3:4173");
   const [customHost, setCustomHost] = useState("");
-  const [qrTarget, setQrTarget] = useState("/#/?ref=qr");
+  const [qrTarget, setQrTarget] = useState("/?ref=qr#/");
   const [qrStats, setQrStats] = useState({
     total_scans: 2,
     today_scans: 2,
@@ -1665,20 +1665,20 @@ export default function SmartStayControlCenter({ onSwitchToClassic }) {
                   <label>{tr.qrTargetDest}</label>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button
-                      className={`btn ${qrTarget === "/#/?ref=qr" ? "btn-blue" : "btn-gray"}`}
-                      onClick={() => setQrTarget("/#/?ref=qr")}
+                      className={`btn ${qrTarget === "/?ref=qr#/" ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => setQrTarget("/?ref=qr#/")}
                     >
                       {lang === "en" ? "Home (?ref=qr)" : "Trang chủ (?ref=qr)"}
                     </button>
                     <button
-                      className={`btn ${qrTarget === "/#/control?tab=guide" ? "btn-blue" : "btn-gray"}`}
-                      onClick={() => setQrTarget("/#/control?tab=guide")}
+                      className={`btn ${qrTarget === "/?ref=qr#/control?tab=guide" ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => setQrTarget("/?ref=qr#/control?tab=guide")}
                     >
                       {lang === "en" ? "GPS & Voice Guide" : "Chỉ đường GPS & Thuyết minh"}
                     </button>
                     <button
-                      className={`btn ${qrTarget === "/#/rooms" ? "btn-blue" : "btn-gray"}`}
-                      onClick={() => setQrTarget("/#/rooms")}
+                      className={`btn ${qrTarget === "/?ref=qr#/rooms" ? "btn-blue" : "btn-gray"}`}
+                      onClick={() => setQrTarget("/?ref=qr#/rooms")}
                     >
                       {lang === "en" ? "Hotel Rooms" : "Danh sách phòng"}
                     </button>
